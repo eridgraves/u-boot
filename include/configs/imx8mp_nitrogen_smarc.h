@@ -1,102 +1,42 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * Copyright 2023 Laird Connect
+ * Copyright 2024 Ezurio
  */
 
 #ifndef __IMX8MP_NITROGEN_SMARC_H
 #define __IMX8MP_NITROGEN_SMARC_H
 
-#ifdef CONFIG_BOARD_TYPE_SET
-#undef CONFIG_SYS_BOARD
-#define CONFIG_SYS_BOARD CONFIG_BOARD_TYPE
-#endif
 #include <linux/sizes.h>
+#include <linux/stringify.h>
 #include <asm/arch/imx-regs.h>
+#include "imx_env.h"
 
-#define CONFIG_SPL_MAX_SIZE		(152 * 1024)
-#define CONFIG_SYS_MONITOR_LEN		SZ_512K
-#define CONFIG_SYS_UBOOT_BASE	(QSPI0_AMBA_BASE + CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR * 512)
-#define CONFIG_IMX6_PWM_PER_CLK		66000000
+#define CFG_SYS_UBOOT_BASE	(QSPI0_AMBA_BASE + CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR * 512)
 
-#ifdef CONFIG_SPL_BUILD
-#define CONFIG_SPL_STACK		0x00960000
-#define CONFIG_SPL_BSS_START_ADDR	0x0098FC00
-
-#define CONFIG_SPL_BSS_MAX_SIZE		0x400	/* 1 KB */
-#define CONFIG_SYS_SPL_MALLOC_START	0x42200000
-#define CONFIG_SYS_SPL_MALLOC_SIZE	SZ_512K	/* 512 KB */
-
-#define CONFIG_SPL_ABORT_ON_RAW_IMAGE
-
-#undef CONFIG_CMD_USB
-#undef CONFIG_CMD_USB_MASS_STORAGE
-#undef CONFIG_USB_GADGET_MASS_STORAGE
-#undef CONFIG_USB_FUNCTION_MASS_STORAGE
-
-#undef CONFIG_DM_ETH
-#undef CONFIG_DM_MMC
-#undef CONFIG_DM_PMIC
-
-#define CONFIG_POWER_I2C
-#define CONFIG_POWER_PCA9450
-
-#define CONFIG_SYS_I2C
-
-#endif
-
-#define CONFIG_CMD_READ
-#define CONFIG_SERIAL_TAG
-#define CONFIG_FASTBOOT_USB_DEV 0
-
-/* ENET Config */
-/* ENET1 */
 #if defined(CONFIG_CMD_NET)
-#define CONFIG_ETHPRIME			"eth0"
+#define CFG_FEC_MXC_PHYADDR		4
+#define PHY_ANEG_TIMEOUT 20000
 
 #define CONFIG_FEC_XCV_TYPE		RGMII
-#define CONFIG_FEC_MXC_PHYADDR		4
+
 #define CONFIG_FEC_MXC_KSZ_PHYADDR	7
 #define FEC_QUIRK_ENET_MAC
 #define GP_RGMII_PHY_RESET		IMX_GPIO_NR(1, 12)
 #define GP_RGMII2_PHY_RESET		IMX_GPIO_NR(3, 16)
 
-#define IMX_FEC_BASE			0x30BE0000
-
-#ifdef CONFIG_DWC_ETH_QOS
-#define CONFIG_SYS_NONCACHED_MEMORY     (1 * SZ_1M)     /* 1M */
-#endif
-
-#define PHY_ANEG_TIMEOUT 20000
 
 #endif
 
-/* Link Definitions */
-#define CONFIG_SYS_INIT_RAM_ADDR	0x40000000
-#define CONFIG_SYS_INIT_RAM_SIZE	0x80000
-#define CONFIG_SYS_INIT_SP_OFFSET \
-	(CONFIG_SYS_INIT_RAM_SIZE - GENERATED_GBL_DATA_SIZE)
-#define CONFIG_SYS_INIT_SP_ADDR \
-	(CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
+#ifdef CONFIG_DISTRO_DEFAULTS
+#define BOOT_TARGET_DEVICES(func) \
+	func(USB, usb, 0) \
+	func(MMC, mmc, 1) \
+	func(MMC, mmc, 2)
 
-/* Size of malloc() pool */
-
-/* bootm image length (Android) */
-#define CONFIG_SYS_BOOTM_LEN		(96 * SZ_1M)
-
-/* Totally 6GB DDR */
-#define CONFIG_SYS_SDRAM_BASE		0x40000000
-#define PHYS_SDRAM			0x40000000
-#define PHYS_SDRAM_SIZE			(CONFIG_DDR_MB * 1024ULL * 1024ULL)
-
-#define CONFIG_MXC_UART_BASE		UART2_BASE_ADDR
-
-/* Monitor Command Prompt */
-#define CONFIG_SYS_PROMPT_HUSH_PS2	"> "
-#define CONFIG_SYS_CBSIZE		2048
-#define CONFIG_SYS_MAXARGS		64
-#define CONFIG_SYS_BARGSIZE CONFIG_SYS_CBSIZE
-#define CONFIG_SYS_PBSIZE		(CONFIG_SYS_CBSIZE + \
-					sizeof(CONFIG_SYS_PROMPT) + 16)
+#include <config_distro_bootcmd.h>
+#else
+#define BOOTENV
+#endif
 
 #define CONFIG_SYS_FSL_USDHC_NUM	3
 #define CONFIG_SYS_FSL_ESDHC_ADDR	0
@@ -122,13 +62,20 @@
 #define CONFIG_SYS_NAND_USE_FLASH_BBT
 #endif /* CONFIG_NAND_MXS */
 
-#ifndef CONFIG_DM_I2C
-#define CONFIG_SYS_I2C
-#endif
-#define CONFIG_SYS_I2C_SPEED		100000
+/* Link Definitions */
+
+#define CFG_SYS_INIT_RAM_ADDR	0x40000000
+#define CFG_SYS_INIT_RAM_SIZE	0x80000
+
+
+/* Totally 6GB DDR */
+#define CFG_SYS_SDRAM_BASE		0x40000000
+#define PHYS_SDRAM			0x40000000
+#define PHYS_SDRAM_SIZE			SZ_2G
+
+#define CFG_MXC_UART_BASE		UART2_BASE_ADDR
 
 /* USB configs */
-#define CONFIG_USB_MAX_CONTROLLER_COUNT         2
 #define CONFIG_USBD_HS
 #define CONFIG_USB_GADGET_VBUS_DRAW 2
 
@@ -241,6 +188,7 @@
 		"fi;\0" \
 	"net_upgradeu=dhcp " BD_RAM_SCRIPT " net_upgradeu.scr && source " BD_RAM_SCRIPT "\0" \
 	"otg_upgradeu=run usbnetwork; tftp " BD_RAM_SCRIPT " net_upgradeu.scr && source " BD_RAM_SCRIPT "\0" \
+	"uboot_defconfig=" CONFIG_DEFCONFIG "\0" \
 	"upgradeu=setenv boot_scripts upgrade.scr; boot;" \
 		"echo Upgrade failed!; setenv boot_scripts boot.scr\0" \
 	"usbnet_devaddr=00:19:b8:00:00:02\0" \

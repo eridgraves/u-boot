@@ -1,136 +1,133 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright 2018-2019 NXP
- * Copyright 2023 Laird Connect
+ * Copyright 2024 Ezurio
  *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
-#include <asm/arch/clock.h>
-#include <asm/arch/ddr.h>
+#include <hang.h>
+#include <init.h>
+#include <log.h>
+#include <spl.h>
+#include <asm/global_data.h>
 #include <asm/arch/imx8mp_pins.h>
 #include <asm/arch/sys_proto.h>
-#include <asm/io.h>
+#include <asm/mach-imx/boot_mode.h>
+#include <power/pmic.h>
+
+#include <power/pca9450.h>
+#include <asm/arch/clock.h>
+#include <dm/uclass.h>
+#include <dm/device.h>
+#include <dm/uclass-internal.h>
+#include <dm/device-internal.h>
 #include <asm/mach-imx/gpio.h>
 #include <asm/mach-imx/iomux-v3.h>
 #include <asm/mach-imx/mxc_i2c.h>
-
-#include <errno.h>
 #include <fsl_esdhc_imx.h>
-#include <hang.h>
-#include <init.h>
 #include <mmc.h>
-#include <power/pca9450.h>
-#include <power/pmic.h>
-#include <spl.h>
-#include "../common/bd_common.h"
-
+#include <asm/arch/ddr.h>
+#include <asm/sections.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#ifdef CONFIG_SPL_BOOTROM_SUPPORT
 int spl_board_boot_device(enum boot_device boot_dev_spl)
 {
+#ifdef CONFIG_SPL_BOOTROM_SUPPORT
 	return BOOT_DEVICE_BOOTROM;
-}
+#else
+	switch (boot_dev_spl) {
+	case SD1_BOOT:
+	case MMC1_BOOT:
+	case SD2_BOOT:
+	case MMC2_BOOT:
+		return BOOT_DEVICE_MMC1;
+	case SD3_BOOT:
+	case MMC3_BOOT:
+		return BOOT_DEVICE_MMC2;
+	case QSPI_BOOT:
+		return BOOT_DEVICE_NOR;
+	case NAND_BOOT:
+		return BOOT_DEVICE_NAND;
+	case USB_BOOT:
+		return BOOT_DEVICE_BOARD;
+	default:
+		return BOOT_DEVICE_NONE;
+	}
 #endif
+}
+
+void spl_dram_init(void)
+{
+	ddr_init(&dram_timing);
+}
 
 void spl_board_init(void)
 {
+	arch_misc_init();
+
 	/*
 	 * Set GIC clock to 500Mhz for OD VDD_SOC. Kernel driver does
 	 * not allow to change it. Should set the clock after PMIC
 	 * setting done. Default is 400Mhz (system_pll1_800m with div = 2)
 	 * set by ROM for ND VDD_SOC
 	 */
+#if defined(CONFIG_IMX8M_LPDDR4) && !defined(CONFIG_IMX8M_VDD_SOC_850MV)
 	clock_enable(CCGR_GIC, 0);
 	clock_set_target_val(GIC_CLK_ROOT, CLK_ROOT_ON | CLK_ROOT_SOURCE_SEL(5));
 	clock_enable(CCGR_GIC, 1);
 
 	puts("Normal Boot\n");
+#endif
 }
 
-#define I2C_PAD_CTRL (PAD_CTL_DSE6 | PAD_CTL_HYS | PAD_CTL_PUE | PAD_CTL_PE)
-struct i2c_pads_info i2c_pad_info1 = {
-	.scl = {
-		.i2c_mode = IOMUX_PAD_CTRL(I2C1_SCL__I2C1_SCL, I2C_PAD_CTRL),
-		.gpio_mode = IOMUX_PAD_CTRL(I2C1_SCL__GPIO5_IO14, I2C_PAD_CTRL),
-		.gp = IMX_GPIO_NR(5, 14),
-	},
-	.sda = {
-		.i2c_mode = IOMUX_PAD_CTRL(I2C1_SDA__I2C1_SDA, I2C_PAD_CTRL),
-		.gpio_mode = IOMUX_PAD_CTRL(I2C1_SDA__GPIO5_IO15, I2C_PAD_CTRL),
-		.gp = IMX_GPIO_NR(5, 15),
-	},
-};
-
-#define USDHC_PAD_CTRL	(PAD_CTL_DSE6 | PAD_CTL_HYS | PAD_CTL_PUE |PAD_CTL_PE | \
-			 PAD_CTL_FSEL2)
-#define USDHC_GPIO_PAD_CTRL (PAD_CTL_HYS | PAD_CTL_DSE1)
-#define USDHC_CD_PAD_CTRL (PAD_CTL_PE |PAD_CTL_PUE |PAD_CTL_HYS | PAD_CTL_DSE4)
-
-
-static iomux_v3_cfg_t const init_pads[] = {
-	IOMUX_PAD_CTRL(SD1_CLK__USDHC1_CLK, USDHC_PAD_CTRL),
-	IOMUX_PAD_CTRL(SD1_CMD__USDHC1_CMD, USDHC_PAD_CTRL),
-	IOMUX_PAD_CTRL(SD1_DATA0__USDHC1_DATA0, USDHC_PAD_CTRL),
-	IOMUX_PAD_CTRL(SD1_DATA1__USDHC1_DATA1, USDHC_PAD_CTRL),
-	IOMUX_PAD_CTRL(SD1_DATA2__USDHC1_DATA2, USDHC_PAD_CTRL),
-	IOMUX_PAD_CTRL(SD1_DATA3__USDHC1_DATA3, USDHC_PAD_CTRL),
-	IOMUX_PAD_CTRL(SD1_DATA4__USDHC1_DATA4, USDHC_PAD_CTRL),
-	IOMUX_PAD_CTRL(SD1_DATA5__USDHC1_DATA5, USDHC_PAD_CTRL),
-	IOMUX_PAD_CTRL(SD1_DATA6__USDHC1_DATA6, USDHC_PAD_CTRL),
-	IOMUX_PAD_CTRL(SD1_DATA7__USDHC1_DATA7, USDHC_PAD_CTRL),
-#define GP_EMMC_RESET		IMX_GPIO_NR(2, 10)
-	IOMUX_PAD_CTRL(SD1_RESET_B__GPIO2_IO10, 0x140),
-
-	IOMUX_PAD_CTRL(SD2_CLK__USDHC2_CLK, USDHC_PAD_CTRL),
-	IOMUX_PAD_CTRL(SD2_CMD__USDHC2_CMD, USDHC_PAD_CTRL),
-	IOMUX_PAD_CTRL(SD2_DATA0__USDHC2_DATA0, USDHC_PAD_CTRL),
-	IOMUX_PAD_CTRL(SD2_DATA1__USDHC2_DATA1, USDHC_PAD_CTRL),
-	IOMUX_PAD_CTRL(SD2_DATA2__USDHC2_DATA2, USDHC_PAD_CTRL),
-	IOMUX_PAD_CTRL(SD2_DATA3__USDHC2_DATA3, USDHC_PAD_CTRL),
-#define GP_USDHC2_CD	IMX_GPIO_NR(2, 12)
-	IOMUX_PAD_CTRL(SD2_CD_B__GPIO2_IO12, 0x1c4),
-};
-
-struct fsl_esdhc_cfg board_usdhc_cfg[] = {
-	{.esdhc_base = USDHC1_BASE_ADDR, .bus_width = 8, .gp_reset = GP_EMMC_RESET},
-	{.esdhc_base = USDHC2_BASE_ADDR, .bus_width = 4, .gp_cd = GP_USDHC2_CD},
-};
-
-#ifdef CONFIG_POWER
-#define I2C_PMIC	0
+#if CONFIG_IS_ENABLED(DM_PMIC_PCA9450)
 int power_init_board(void)
 {
-	struct pmic *p;
+	struct udevice *dev;
 	int ret;
 
-	ret = power_pca9450_init(I2C_PMIC, 0x25);
-	if (ret)
-		printf("power init failed");
-	p = pmic_get("PCA9450");
-	pmic_probe(p);
+	ret = pmic_get("pmic@25", &dev);
+	if (ret == -ENODEV) {
+		puts("No pmic@25\n");
+		return 0;
+	}
+	if (ret < 0)
+		return ret;
 
 	/* BUCKxOUT_DVS0/1 control BUCK123 output */
-	pmic_reg_write(p, PCA9450_BUCK123_DVS, 0x29);
+	pmic_reg_write(dev, PCA9450_BUCK123_DVS, 0x29);
 
+#ifdef CONFIG_IMX8M_LPDDR4
 	/*
-	 * increase VDD_SOC to typical value 0.95V before first
-	 * DRAM access, set DVS1 to 0.85v for suspend.
+	 * Increase VDD_SOC to typical value 0.95V before first
+	 * DRAM access, set DVS1 to 0.85V for suspend.
 	 * Enable DVS control through PMIC_STBY_REQ and
 	 * set B1_ENMODE=1 (ON by PMIC_ON_REQ=H)
 	 */
-	pmic_reg_write(p, PCA9450_BUCK1OUT_DVS0, 0x1C);
-	pmic_reg_write(p, PCA9450_BUCK1OUT_DVS1, 0x14);
-	pmic_reg_write(p, PCA9450_BUCK1CTRL, 0x59);
+	if (CONFIG_IS_ENABLED(IMX8M_VDD_SOC_850MV))
+		pmic_reg_write(dev, PCA9450_BUCK1OUT_DVS0, 0x14);
+	else
+		pmic_reg_write(dev, PCA9450_BUCK1OUT_DVS0, 0x1C);
 
-	/* Kernel uses OD/OD freq for SOC */
-	/* To avoid timing risk from SOC to ARM,increase VDD_ARM to OD voltage 0.95v */
-	pmic_reg_write(p, PCA9450_BUCK2OUT_DVS0, 0x1C);
+	pmic_reg_write(dev, PCA9450_BUCK1OUT_DVS1, 0x14);
+	pmic_reg_write(dev, PCA9450_BUCK1CTRL, 0x59);
 
-	/* set WDOG_B_CFG to cold reset */
-	pmic_reg_write(p, PCA9450_RESET_CTRL, 0xA1);
+	/*
+	 * Kernel uses OD/OD freq for SOC.
+	 * To avoid timing risk from SOC to ARM,increase VDD_ARM to OD
+	 * voltage 0.95V.
+	 */
+
+	pmic_reg_write(dev, PCA9450_BUCK2OUT_DVS0, 0x1C);
+#elif defined(CONFIG_IMX8M_DDR4)
+	/* DDR4 runs at 3200MTS, uses default ND 0.85v for VDD_SOC and VDD_ARM */
+	pmic_reg_write(dev, PCA9450_BUCK1CTRL, 0x59);
+
+	/* Set NVCC_DRAM to 1.2v for DDR4 */
+	pmic_reg_write(dev, PCA9450_BUCK6OUT, 0x18);
+#endif
 
 	return 0;
 }
@@ -140,7 +137,7 @@ int power_init_board(void)
 int board_fit_config_name_match(const char *name)
 {
 	/* Just empty function now - can't decide what to choose */
-	pr_debug("%s: %s\n", __func__, name);
+	debug("%s: %s\n", __func__, name);
 
 	return 0;
 }
@@ -148,27 +145,40 @@ int board_fit_config_name_match(const char *name)
 
 void board_init_f(ulong dummy)
 {
+	struct udevice *dev;
 	int ret;
+
+	/* Clear the BSS. */
+	memset(__bss_start, 0, __bss_end - __bss_start);
 
 	arch_cpu_init();
 
 	board_early_init_f();
 
-	preloader_console_init();
+	timer_init();
 
 	ret = spl_early_init();
 	if (ret) {
-		pr_debug("spl_init() failed: %d\n", ret);
+		debug("spl_early_init() failed: %d\n", ret);
 		hang();
 	}
 
-	enable_tzc380();
-	imx_iomux_v3_setup_multiple_pads(init_pads, ARRAY_SIZE(init_pads));
+	ret = uclass_get_device_by_name(UCLASS_CLK,
+					"clock-controller@30380000",
+					&dev);
+	if (ret < 0) {
+		printf("Failed to find clock node. Check device tree\n");
+		hang();
+	}
 
-	/* Adjust pmic voltage to 1.0V for 800M */
-	setup_i2c(0, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info1);
+	preloader_console_init();
+
+	enable_tzc380();
 
 	power_init_board();
+
 	/* DDR initialization */
 	spl_dram_init();
+
+	board_init_r(NULL, 0);
 }
