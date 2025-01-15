@@ -80,6 +80,12 @@
 	bootph-pre-ram;
 };
 
+&pinctrl_usbotg1 {
+	fsl,pins = <
+		MX8ULP_PAD_PTD12__USB0_ID	0x10003
+	>;
+};
+
 &pinctrl_usdhc0 {
 	bootph-pre-ram;
 };
@@ -110,6 +116,7 @@
 
 &usbotg1 {
 	compatible = "fsl,imx8ulp-usb", "fsl,imx7ulp-usb", "fsl,imx27-usb";
+	dr_mode = "peripheral";
 };
 
 &usbotg2 {

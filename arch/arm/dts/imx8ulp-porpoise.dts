@@ -273,6 +273,12 @@
 		>;
 	};
 
+	pinctrl_usbotg1: usbotg1grp {
+		fsl,pins = <
+			MX8ULP_PAD_PTD12__USB0_ID       0x10003 /* Fastboot */
+		>;
+	};
+
 	pinctrl_reg_usbotg2_vbus: regusbotg2vbusgrp {
 		fsl,pins = <
 			MX8ULP_PAD_PTE11__PTE11		0x03	/* USB_VBUS_EN */
@@ -334,7 +340,9 @@
 };
 
 &usbotg1 { /* USB0 / MAIN_USB (ZIF) */
-	dr_mode = "host";
+	dr_mode = "periferal";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_usbotg1>;
 	status = "okay";
 };
 
