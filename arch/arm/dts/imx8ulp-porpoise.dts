@@ -340,7 +340,7 @@
 };
 
 &usbotg1 { /* USB0 / MAIN_USB (ZIF) */
-	dr_mode = "periferal";
+	dr_mode = "peripheral";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_usbotg1>;
 	status = "okay";
