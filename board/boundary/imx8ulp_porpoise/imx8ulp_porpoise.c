@@ -14,6 +14,7 @@
 #include <netdev.h>
 #include <asm/gpio.h>
 #include <power-domain.h>
+#include <usb.h>
 #include <dt-bindings/power/imx8ulp-power.h>
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -94,6 +95,15 @@ int board_phy_config(struct phy_device *phydev)
 	return 0;
 }
 #endif
+
+/* This platform doesn't have any OTG ID pin connected */
+int board_ci_udc_otg_phy_mode(struct udevice *dev)
+{
+	if (dev_seq(dev) == 0)
+		return USB_INIT_DEVICE;
+
+	return USB_INIT_HOST;
+}
 
 int board_init(void)
 {
