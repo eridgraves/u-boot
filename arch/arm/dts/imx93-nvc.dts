@@ -104,6 +104,7 @@
 	pinctrl-1 = <&pinctrl_eqos_sleep>;
 	phy-mode = "rgmii-id";
 	phy-handle = <&ethphy1>;
+	max-speed = <100>;
 	status = "okay";
 
 	mdio {
