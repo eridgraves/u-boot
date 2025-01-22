@@ -39,7 +39,7 @@
 	CFG_MFG_ENV_SETTINGS \
 	BOOTENV \
 	AHAB_ENV \
-	"board=nitrogen-smarc\0" \
+	"board=imx93_nvc\0" \
 	"soc_type=imx93\0" \
 	"env_dev=" __stringify(CONFIG_SYS_MMC_ENV_DEV) "\0" \
 	"env_part=" __stringify(CONFIG_SYS_MMC_ENV_PART) "\0" \
